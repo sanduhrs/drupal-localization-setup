@@ -1,0 +1,59 @@
+<?php
+
+/**
+ * @file
+ * Provides installation routines.
+ */
+
+/**
+ * Implements hook_schema().
+ */
+function l10n_google_translate_schema() {
+  $schema['l10n_google_translate'] = array(
+    'description' => 'The base table for google string translations.',
+    'fields' => array(
+      'gtid' => array(
+        'description' => 'Internal numeric identifier for a google translation.',
+        'type' => 'serial',
+        'not null' => TRUE,
+        'disp-width' => '11',
+      ),
+      'sid' => array(
+        'description' => 'Reference to the {l10n_server_string}.sid which is being translated.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'disp-width' => '11',
+      ),
+      'translation' => array(
+        'description' => 'The actual translation or suggestion.',
+        'type' => 'text',
+        'not null' => TRUE,
+        'binary' => TRUE,
+      ),
+    ),
+    'primary key' => array('sid'),
+    'indexes' => array(
+      'gtid' => array('gtid'),
+    ),
+    // For documentation purposes only; foreign keys are not created in the
+    // database.
+    'foreign keys' => array(
+      'l10n_server_string' => array(
+        'table' => 'l10n_server_string',
+        'columns' => array('sid' => 'sid'),
+      ),
+    ),
+  );
+  $schema['cache_l10n_google_translate'] = drupal_get_schema_unprocessed('system', 'cache');
+  $schema['cache_l10n_google_translate']['description'] = 'Cache table for the l10n_google_translate module to store already calculated information.';
+  return $schema;
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function l10n_google_translate_uninstall() {
+  db_delete('variable')
+    ->condition('name', 'l10n_google_translate_%', 'LIKE')
+    ->execute();
+}

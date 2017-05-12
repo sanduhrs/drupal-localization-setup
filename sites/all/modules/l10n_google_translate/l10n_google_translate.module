@@ -1,0 +1,129 @@
+<?php
+
+/**
+ * @file
+ * Google translatefunctionality for the l10n suite of modules.
+ */
+
+require_once __DIR__ . '/vendor/autoload.php';
+
+use Google\Cloud\Translate\TranslateClient;
+
+/**
+ * Implements hook_block_menu().
+ */
+function l10n_google_translate_menu() {
+  $items['l10n-google-translate'] = array(
+    'page callback' => 'l10n_google_translate_callback',
+    'page arguments' => array(1),
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+  );
+  return $items;
+}
+
+/**
+ * Implements hook_block_info().
+ */
+function l10n_google_translate_block_info() {
+  $blocks['translation'] = array(
+    'info' => t('Translation suggestion'),
+    'cache' => DRUPAL_CACHE_GLOBAL,
+  );
+  return $blocks;
+}
+
+/**
+ * Implements hook_block_view().
+ */
+function l10n_google_translate_block_view($delta = '') {
+  $block = array();
+  switch ($delta) {
+    case 'translation':
+      $block['subject'] = t('Translation');
+      $block['content'] = array(
+        '#markup' => '<div id="l10n-google-translate-suggestion"></div>',
+        '#attached' => array(
+          'css' => array(
+            drupal_get_path('module', 'l10n_google_translate') . '/css/l10n_google_translate.css',
+          ),
+          'js' => array(
+            drupal_get_path('module', 'l10n_google_translate') . '/js/l10n_google_translate.js',
+          ),
+        ),
+      );
+      break;
+  }
+  return $block;
+}
+
+/**
+ * Google translate menu callback.
+ *
+ * @param int $sid
+ *   The string id.
+ */
+function l10n_google_translate_callback($sid) {
+  $cid = $sid;
+  $cache = cache_get($cid, 'cache_l10n_google_translate');
+  if ($cache) {
+    $data = $cache->data;
+  }
+  else {
+    module_load_include('inc', 'l10n_community', 'translate');
+
+    // Load the string.
+    $string = db_query(
+      'SELECT * FROM {l10n_server_string} WHERE sid = :sid',
+      array(':sid' => $sid)
+    )->fetchObject();
+    $unpacked = l10n_community_unpack_string($string->value);
+
+    $data = [];
+    foreach ($unpacked as $string) {
+      $data[] = l10n_google_translate_api($string, 'de');
+    }
+
+    cache_set($cid, $data, 'cache_l10n_google_translate', CACHE_PERMANENT);
+  }
+
+  header('Content-Type: application/json');
+  print json_encode($data);
+  drupal_exit();
+}
+
+/**
+ * Google translate API access.
+ *
+ * @param string $text
+ *   The string to translate.
+ * @param string $target
+ *   The target language short code.
+ * @param string $source
+ *   The source language short code.
+ *
+ * @return array
+ *   An translation array.
+ */
+function l10n_google_translate_api($text, $target = 'de', $source = 'en') {
+  putenv('GOOGLE_APPLICATION_CREDENTIALS=' . variable_get('l10n_google_translate_credentials_directory', __DIR__) . '/credentials.json');
+
+  $translate = new TranslateClient([
+    'projectId' => variable_get('l10n_google_translate_project_id', ''),
+  ]);
+
+  try {
+    $translation = $translate->translate(
+      $text,
+      [
+        'target' => $target,
+        'source' => $source,
+      ]
+    );
+    return $translation;
+  }
+  catch (Exception $e) {
+    watchdog('l10n-google-translate', $e->getMessage(), array(), WATCHDOG_ERROR);
+  }
+  return array();
+}

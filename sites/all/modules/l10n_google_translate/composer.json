@@ -1,0 +1,14 @@
+{
+    "name": "drupal/l10n_google_translate",
+    "type": "drupal-module",
+    "license": "GPL",
+    "authors": [
+        {
+            "name": "Stefan Auditor",
+            "email": "stefan.auditor@erdfisch.de"
+        }
+    ],
+    "require": {
+        "google/cloud-translate": "^0.2.0"
+    }
+}
